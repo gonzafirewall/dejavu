@@ -61,7 +61,7 @@ class SQLDatabase(Database):
     # creates
     CREATE_FINGERPRINTS_TABLE = """
         CREATE TABLE IF NOT EXISTS `%s` (
-             `%s` binary(10) not null,
+             `%s` binary(20) not null,
              `%s` mediumint unsigned not null,
              `%s` int unsigned not null,
          INDEX (%s),
@@ -91,7 +91,7 @@ class SQLDatabase(Database):
     # inserts (ignores duplicates)
     INSERT_FINGERPRINT = """
         INSERT IGNORE INTO %s (%s, %s, %s) values
-            (UNHEX(%%s), %%s, %%s);
+            (%%s, %%s, %%s);
     """ % (FINGERPRINTS_TABLENAME, Database.FIELD_HASH, Database.FIELD_SONG_ID, Database.FIELD_OFFSET)
 
     INSERT_SONG = "INSERT INTO %s (%s, %s) values (%%s, UNHEX(%%s));" % (
@@ -103,7 +103,7 @@ class SQLDatabase(Database):
     """ % (Database.FIELD_SONG_ID, Database.FIELD_OFFSET, FINGERPRINTS_TABLENAME, Database.FIELD_HASH)
 
     SELECT_MULTIPLE = """
-        SELECT HEX(%s), %s, %s FROM %s WHERE %s IN (%%s);
+        SELECT %s, %s, %s FROM %s WHERE %s IN (%%s);
     """ % (Database.FIELD_HASH, Database.FIELD_SONG_ID, Database.FIELD_OFFSET,
            FINGERPRINTS_TABLENAME, Database.FIELD_HASH)
 
@@ -237,7 +237,7 @@ class SQLDatabase(Database):
         Insert a (sha1, song_id, offset) row into database.
         """
         with self.cursor() as cur:
-            cur.execute(self.INSERT_FINGERPRINT, (hash, sid, offset))
+            cur.execute(self.INSERT_FINGERPRINT, (hash.encode(), sid, offset))
 
     def insert_song(self, songname, file_hash):
         """
@@ -270,12 +270,12 @@ class SQLDatabase(Database):
 
     def insert_hashes(self, sid, hashes):
         """
-        Insert series of hash => song_id, offset
+        Insert series of hash => song_i d, offset
         values into the database.
         """
         values = []
-        for hash, offset in hashes:
-            values.append((hash, sid, offset))
+        for ahash, offset in hashes:
+            values.append((ahash.encode(), sid, offset))
 
         with self.cursor() as cur:
             for split_values in grouper(values, 1000):
@@ -289,7 +289,7 @@ class SQLDatabase(Database):
         # Create a dictionary of hash => offset pairs for later lookups
         mapper = {}
         for hash, offset in hashes:
-            mapper[hash.upper()] = offset
+            mapper[hash.encode()] = offset
 
         # Get an iteratable of all the hashes we need
         values = mapper.keys()
@@ -300,10 +300,10 @@ class SQLDatabase(Database):
 
                 # Create our IN part of the query
                 query = self.SELECT_MULTIPLE
-                query = query % ', '.join(['UNHEX(%s)'] * len(split_values))
-
+                query = query % ', '.join(['%s'] * len(split_values))
                 cur.execute(query, split_values)
 
+                
                 for hash, sid, offset in cur:
                     # (sid, db_offset - song_sampled_offset)
                     yield (sid, offset - mapper[hash])

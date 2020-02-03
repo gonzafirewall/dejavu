@@ -174,6 +174,6 @@ def get_database(database_type=None):
 
 # Import our default database handler
 # MySQL
-# import dejavu.database_sql
+import dejavu.database_sql
 # SQLite
-import dejavu.database_sqlite
+# import dejavu.database_sqlite
